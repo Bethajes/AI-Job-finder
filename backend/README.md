@@ -72,7 +72,7 @@ The backend follows a **modular monolith** architecture rather than microservice
 
 ### Mobile
 
-`apps/mobile`
+`mobile-app/`
 
 Technology:
 
@@ -90,7 +90,7 @@ Technology:
 
 ### Employer Dashboard
 
-`apps/employer`
+`employer-dashboard/`
 
 Technology:
 
@@ -103,7 +103,7 @@ Technology:
 
 ### Admin Dashboard
 
-`apps/admin`
+`admin-dashboard/`
 
 Technology:
 
@@ -116,7 +116,7 @@ Technology:
 
 ### API
 
-`apps/api`
+`backend/`
 
 Technology:
 
@@ -192,58 +192,60 @@ Planned deployment:
 ## Repository Structure
 
 ```text
-jobfinder/
+ethiopian-job-platform/
 │
-├── apps/
-│   ├── mobile/
-│   ├── employer/
-│   ├── admin/
-│   └── api/
+├── backend/
+│   ├── app/
+│   ├── alembic/
+│   ├── tests/
+│   └── ...
 │
-├── packages/
-│   ├── ui/
-│   ├── types/
-│   ├── config/
-│   └── utils/
+├── mobile-app/
+├── employer-dashboard/
+├── admin-dashboard/
 │
 ├── docs/
-│   ├── architecture/
-│   ├── api/
-│   ├── database/
-│   ├── prd/
-│   └── uiux/
+│   ├── Architecture.md
+│   ├── API.md
+│   ├── Database.md
+│   ├── PRD.md
+│   └── Roadmap.md
 │
-├── scripts/
-├── docker/
-├── .github/
 ├── README.md
+├── CONTRIBUTING.md
 └── .gitignore
 ```
+
+> Note: The documentation originally described an `apps/` monorepo layout.
+> The actual repository uses top-level `backend/`, `mobile-app/`,
+> `employer-dashboard/`, and `admin-dashboard/` directories. Shared packages
+> (`packages/`) do not exist yet and are a future option.
 
 ---
 
 ## Backend Structure
 
 ```text
-apps/api/
+backend/
 
 app/
 
 ├── api/
-│   ├── routes/
-│   ├── dependencies/
-│   └── middleware/
+│   ├── v1/
+│   │   ├── endpoints/
+│   │   ├── dependencies.py
+│   │   └── router.py
 │
 ├── core/
 │   ├── config.py
 │   ├── security.py
-│   └── database.py
+│   ├── database.py
+│   └── exceptions.py
 │
 ├── models/
 ├── schemas/
 ├── services/
 ├── repositories/
-├── utils/
 ├── tests/
 └── main.py
 ```
@@ -267,21 +269,23 @@ app/
 ## Mobile Structure
 
 ```text
-apps/mobile/
+mobile-app/
 
 src/
 
 ├── assets/
 ├── components/
-├── features/
+│   ├── auth/
+│   ├── common/
+│   ├── jobs/
+│   └── profile/
+├── navigation/
+├── screens/
 │   ├── auth/
 │   ├── jobs/
 │   ├── profile/
-│   ├── employer/
 │   └── applications/
-├── navigation/
-├── screens/
-├── services/
+├── api/
 ├── hooks/
 ├── store/
 ├── utils/
@@ -291,6 +295,9 @@ src/
 ```
 
 The mobile application is organized primarily by feature so that functionality can evolve independently.
+
+> Note: The mobile app is currently scaffolding only — no application code has
+> been implemented yet.
 
 ---
 
@@ -323,21 +330,19 @@ Project documentation lives inside `docs/`.
 
 ```text
 docs/
-├── architecture/
-├── api/
-├── database/
-├── prd/
-└── uiux/
+├── Architecture.md
+├── API.md
+├── Database.md
+├── PRD.md
+└── Roadmap.md
 ```
 
 See:
 
-* [Architecture](docs/architecture/ARCHITECTURE.md)
-* [Database](docs/database/DATABASE.md)
-* [API](docs/api/API.md)
-* [Product Requirements](docs/prd/PRD.md)
-* [UI/UX](docs/uiux/UI.md)
-* [Roadmap](docs/ROADMAP.md)
+* [Architecture](docs/Architecture.md)
+* [Database](docs/Database.md)
+* [API](docs/API.md)
+* [Roadmap](docs/Roadmap.md)
 
 ---
 
@@ -347,14 +352,18 @@ The project is currently in:
 
 **Foundation**
 
+The foundation audit is complete. The backend application starts, the health
+endpoint works, database connectivity and Alembic are verified, and the
+authentication/security utilities are in place.
+
 Current priorities:
 
-1. Finalize architecture
-2. Create repository
-3. Initialize monorepo
-4. Scaffold applications
-5. Configure backend
-6. Configure database
+1. ~~Finalize architecture~~
+2. ~~Create repository~~
+3. ~~Scaffold applications~~
+4. ~~Configure backend~~
+5. ~~Configure database~~
+6. Implement authentication (email/password + JWT)
 7. Establish development workflow
 
 ---

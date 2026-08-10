@@ -12,43 +12,41 @@ Read these documents first:
 
 ```text
 README.md
-docs/architecture/ARCHITECTURE.md
-docs/database/DATABASE.md
-docs/api/API.md
-docs/prd/PRD.md
-```
-
-If you are working on the UI, also read:
-
-```text
-docs/uiux/UI.md
+docs/Architecture.md
+docs/Database.md
+docs/API.md
+docs/PRD.md
 ```
 
 ---
 
 # 2. Project Structure
 
-JobFinder uses a monorepo:
+The repository is structured as:
 
 ```text
-apps/
-├── mobile/
-├── employer/
-├── admin/
-└── api/
+backend/
+├── app/
+│   ├── api/
+│   ├── core/
+│   ├── models/
+│   ├── schemas/
+│   ├── services/
+│   ├── repositories/
+│   └── main.py
+├── alembic/
+├── tests/
 
-packages/
-├── ui/
-├── types/
-├── config/
-└── utils/
+mobile-app/
+admin-dashboard/
+employer-dashboard/
 
 docs/
-├── architecture/
-├── api/
-├── database/
-├── prd/
-└── uiux/
+├── Architecture.md
+├── API.md
+├── Database.md
+├── PRD.md
+└── Roadmap.md
 ```
 
 Do not create new top-level directories without discussing the architectural reason.

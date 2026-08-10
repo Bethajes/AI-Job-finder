@@ -81,7 +81,7 @@ The system should still maintain strong internal boundaries between modules.
 Location:
 
 ```text
-apps/mobile/
+mobile-app/
 ```
 
 Technology:
@@ -104,15 +104,17 @@ The mobile application is organized by feature.
 src/
 ├── assets/
 ├── components/
-├── features/
+│   ├── auth/
+│   ├── common/
+│   ├── jobs/
+│   └── profile/
+├── navigation/
+├── screens/
 │   ├── auth/
 │   ├── jobs/
 │   ├── profile/
-│   ├── employer/
 │   └── applications/
-├── navigation/
-├── screens/
-├── services/
+├── api/
 ├── hooks/
 ├── store/
 ├── utils/
@@ -128,7 +130,7 @@ src/
 Location:
 
 ```text
-apps/employer/
+employer-dashboard/
 ```
 
 Technology:
@@ -147,7 +149,7 @@ The employer dashboard communicates with the same FastAPI backend as the mobile 
 Location:
 
 ```text
-apps/admin/
+admin-dashboard/
 ```
 
 Technology:
@@ -166,7 +168,7 @@ The admin application provides administrative functionality while authorization 
 Location:
 
 ```text
-apps/api/
+backend/
 ```
 
 Technology:
@@ -185,20 +187,21 @@ Backend structure:
 app/
 
 ├── api/
-│   ├── routes/
-│   ├── dependencies/
-│   └── middleware/
+│   ├── v1/
+│   │   ├── endpoints/
+│   │   ├── dependencies.py
+│   │   └── router.py
 │
 ├── core/
 │   ├── config.py
 │   ├── security.py
-│   └── database.py
+│   ├── database.py
+│   └── exceptions.py
 │
 ├── models/
 ├── schemas/
 ├── services/
 ├── repositories/
-├── utils/
 ├── tests/
 └── main.py
 ```
@@ -517,32 +520,26 @@ Docker and GitHub Actions are part of the planned DevOps foundation.
 
 ---
 
-# 16. Monorepo
+# 16. Repository Structure
 
-The complete repository:
+The repository is structured as:
 
 ```text
-jobfinder/
+ethiopian-job-platform/
 
-├── apps/
-│   ├── mobile/
-│   ├── employer/
-│   ├── admin/
-│   └── api/
-│
-├── packages/
-│   ├── ui/
-│   ├── types/
-│   ├── config/
-│   └── utils/
-│
+├── backend/
+├── mobile-app/
+├── employer-dashboard/
+├── admin-dashboard/
 ├── docs/
-├── scripts/
-├── docker/
-└── .github/
+├── CONTRIBUTING.md
+└── .gitignore
 ```
 
-This keeps related applications and shared packages in one repository.
+> Note: The documentation originally described an `apps/` monorepo layout with
+> shared `packages/`. The actual repository uses top-level directories and has
+> no shared package workspace yet. Introduce one only when sharing code between
+> applications actually requires it.
 
 ---
 
