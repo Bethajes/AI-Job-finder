@@ -3,6 +3,7 @@ from app.core.database import Base, get_db
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    create_email_verification_token,
     verify_token,
     verify_password,
     get_password_hash
@@ -22,6 +23,7 @@ __all__ = [
     "get_db",
     "create_access_token",
     "create_refresh_token",
+    "create_email_verification_token",
     "verify_token",
     "verify_password",
     "get_password_hash",

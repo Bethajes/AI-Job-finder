@@ -32,6 +32,7 @@ class UnauthorizedException(AppException):
     """Unauthorized."""
     def __init__(self, detail: str = "Unauthorized"):
         super().__init__(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+        self.headers = {"WWW-Authenticate": "Bearer"}
 
 
 class ForbiddenException(AppException):
