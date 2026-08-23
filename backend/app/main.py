@@ -40,7 +40,11 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
         body["error_code"] = exc.error_code
     if exc.data is not None:
         body["data"] = exc.data
-    return JSONResponse(status_code=exc.status_code, content=body)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=body,
+        headers=getattr(exc, "headers", None),
+    )
 
 
 @app.exception_handler(RequestValidationError)

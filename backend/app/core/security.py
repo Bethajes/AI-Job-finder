@@ -11,6 +11,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 ACCESS_TOKEN_TYPE = "access"
 REFRESH_TOKEN_TYPE = "refresh"
+EMAIL_VERIFICATION_TOKEN_TYPE = "email_verification"
 
 
 def get_password_hash(password: str) -> str:
@@ -47,6 +48,22 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
 def create_refresh_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
     delta = expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     return _create_token(subject, REFRESH_TOKEN_TYPE, delta)
+
+
+def create_email_verification_token(subject: str, email: str) -> str:
+    now = datetime.now(timezone.utc)
+    payload: dict[str, Any] = {
+        "sub": subject,
+        "email": email,
+        "type": EMAIL_VERIFICATION_TOKEN_TYPE,
+        "iat": now,
+        "exp": now + timedelta(hours=24),
+    }
+    return jwt.encode(
+        payload,
+        settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM,
+    )
 
 
 def verify_token(token: str, expected_type: Optional[str] = None) -> dict[str, Any]:
