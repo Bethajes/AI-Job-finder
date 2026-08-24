@@ -52,9 +52,19 @@ async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     """Keep default Pydantic validation errors but avoid exposing raw values."""
+    safe_errors = []
+    for err in exc.errors():
+        err = dict(err)
+        ctx = err.get("ctx")
+        if isinstance(ctx, dict):
+            err["ctx"] = {
+                key: value if isinstance(value, (str, int, float, bool)) else str(value)
+                for key, value in ctx.items()
+            }
+        safe_errors.append(err)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": exc.errors()},
+        content={"detail": safe_errors},
     )
 
 

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.job import Job
     from app.models.user import User
 
 
@@ -50,6 +51,9 @@ class Company(Base):
     )
 
     owner: Mapped["User"] = relationship("User", back_populates="companies")
+    jobs: Mapped[list["Job"]] = relationship(
+        "Job", back_populates="company", passive_deletes=True
+    )
 
     def __repr__(self) -> str:
         return f"<Company {self.name}>"
