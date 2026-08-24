@@ -202,3 +202,94 @@ class JobActionResponse(BaseModel):
     id: uuid.UUID
     status: JobStatusLiteral
     detail: str
+
+
+# ── Week 5: Search / filtering / sorting ────────────────────────────
+
+SortByLiteral = Literal["relevance", "posted_date", "salary_max", "salary_min"]
+SortOrderLiteral = Literal["asc", "desc"]
+
+
+class JobSearchFilters(BaseModel):
+    """Validated search + filter parameters for GET /jobs/search."""
+
+    q: Optional[str] = Field(None, max_length=200)
+    employment_type: Optional[EmploymentTypeLiteral] = None
+    experience_level: Optional[ExperienceLevelLiteral] = None
+    salary_min: Optional[Decimal] = Field(None, ge=0, le=999_999_999_999)
+    salary_max: Optional[Decimal] = Field(None, ge=0, le=999_999_999_999)
+    location: Optional[str] = Field(None, max_length=255)
+    is_remote: Optional[bool] = None
+    days_ago: Optional[int] = Field(None, ge=1, le=365)
+    company_id: Optional[uuid.UUID] = None
+    sort_by: SortByLiteral = "relevance"
+    sort_order: SortOrderLiteral = "desc"
+
+    @field_validator("q")
+    @classmethod
+    def strip_query(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        stripped = v.strip()
+        return stripped or None
+
+    @model_validator(mode="after")
+    def validate_salary_range(self) -> "JobSearchFilters":
+        if (
+            self.salary_min is not None
+            and self.salary_max is not None
+            and self.salary_min > self.salary_max
+        ):
+            raise ValueError("salary_min must be less than or equal to salary_max")
+        return self
+
+
+class JobSearchItem(BaseModel):
+    """Slim job card used in search results."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    employment_type: EmploymentTypeLiteral
+    experience_level: ExperienceLevelLiteral
+    salary_min: Optional[Decimal] = None
+    salary_max: Optional[Decimal] = None
+    currency: str
+    location: Optional[str] = None
+    is_remote: bool
+    company_id: uuid.UUID
+    company: CompanyBrief
+    posted_date: Optional[datetime] = None
+    application_deadline: Optional[datetime] = None
+    category: Optional[str] = None
+    tags: list[str]
+    views_count: int
+    relevance_score: Optional[float] = None
+
+    @field_serializer("salary_min", "salary_max", "relevance_score")
+    def serialize_floats(self, value: Optional[Decimal]) -> Optional[float]:
+        return float(value) if value is not None else None
+
+
+class JobSearchResponse(BaseModel):
+    items: list[JobSearchItem]
+    total: int
+    page: int
+    limit: int
+    pages: int
+    has_next: bool
+    has_previous: bool
+
+
+# ── Week 5: Enhanced job detail ─────────────────────────────────────
+
+
+class JobDetailResponse(JobResponse):
+    """Full job view with company info and related openings."""
+
+    related_jobs: list["JobSearchItem"] = Field(default_factory=list)
+
+
+JobSearchItem.model_rebuild()
+JobDetailResponse.model_rebuild()

@@ -115,7 +115,10 @@ class JobService:
         *,
         viewer: Optional[User] = None,
         track_view: bool = True,
-    ) -> Job:
+        include_related: bool = False,
+        related_limit: int = 5,
+    ) -> tuple[Job, Sequence[Job]]:
+        """Fetch a job (visibility-checked) optionally with related openings."""
         job = await self.repository.get_by_id(job_id)
         if job is None:
             raise NotFoundException(detail="Job not found")
@@ -128,7 +131,57 @@ class JobService:
             job.views_count += 1
             await self.session.commit()
             await self.session.refresh(job)
-        return job
+
+        related: Sequence[Job] = []
+        if include_related and job.status == JobStatus.published:
+            related = await self.repository.find_related_jobs(
+                job, limit=related_limit
+            )
+        return job, related
+
+    async def search_jobs(
+        self,
+        *,
+        page: int = 1,
+        limit: int = 20,
+        q: Optional[str] = None,
+        employment_type: Optional[str] = None,
+        experience_level: Optional[str] = None,
+        salary_min: Optional[Decimal] = None,
+        salary_max: Optional[Decimal] = None,
+        location: Optional[str] = None,
+        is_remote: Optional[bool] = None,
+        days_ago: Optional[int] = None,
+        company_id: Optional[uuid.UUID] = None,
+        sort_by: str = "relevance",
+        sort_order: str = "desc",
+    ) -> tuple[list[tuple[Job, Optional[float]]], int]:
+        """Public search over published jobs with filters, sorting, pagination.
+
+        Relevance sorting requires a search query; without one it falls back
+        to newest-first.
+        """
+        effective_sort_by = sort_by
+        if not q and sort_by == "relevance":
+            effective_sort_by = "posted_date"
+            sort_order = "desc"
+
+        offset = (page - 1) * limit
+        return await self.repository.search_with_filters(
+            q=q,
+            employment_type=employment_type,
+            experience_level=experience_level,
+            salary_min=salary_min,
+            salary_max=salary_max,
+            location=location,
+            is_remote=is_remote,
+            days_ago=days_ago,
+            company_id=company_id,
+            sort_by=effective_sort_by,
+            sort_order=sort_order,
+            offset=offset,
+            limit=limit,
+        )
 
     async def list_public_jobs(
         self,

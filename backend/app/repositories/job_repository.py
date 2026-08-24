@@ -1,8 +1,9 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Optional, Sequence
 
-from sqlalchemy import func, select, update
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -137,6 +138,164 @@ class JobRepository:
             .limit(limit)
         )
         return result.scalars().all(), total
+
+    # ── Week 5: Full-text search, filtering, sorting ───────────────────
+
+    @staticmethod
+    def _build_tsquery(query_text: str) -> Any:
+        """User-friendly tsquery: supports quoted phrases, OR and -exclusions."""
+        return func.websearch_to_tsquery("english", query_text)
+
+    def _apply_filters(
+        self,
+        stmt: Select,
+        *,
+        employment_type: Optional[str] = None,
+        experience_level: Optional[str] = None,
+        salary_min: Optional[Decimal] = None,
+        salary_max: Optional[Decimal] = None,
+        location: Optional[str] = None,
+        is_remote: Optional[bool] = None,
+        days_ago: Optional[int] = None,
+        company_id: Optional[uuid.UUID] = None,
+    ) -> Select:
+        conditions: list[Any] = []
+        if employment_type is not None:
+            conditions.append(Job.employment_type == employment_type)
+        if experience_level is not None:
+            conditions.append(Job.experience_level == experience_level)
+        # Salary overlap semantics:
+        #   user_min -> job's advertised max must reach it
+        #   user_max -> job's advertised min must not exceed it
+        if salary_min is not None:
+            conditions.append(Job.salary_max >= salary_min)
+        if salary_max is not None:
+            conditions.append(Job.salary_min <= salary_max)
+        if location:
+            conditions.append(Job.location.ilike(f"%{location}%"))
+        if is_remote is not None:
+            conditions.append(Job.is_remote.is_(is_remote))
+        if days_ago is not None:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days_ago)
+            conditions.append(Job.posted_date >= cutoff)
+        if company_id is not None:
+            conditions.append(Job.company_id == company_id)
+
+        for condition in conditions:
+            stmt = stmt.where(condition)
+        return stmt
+
+    @staticmethod
+    def _order_clause(
+        sort_by: str,
+        sort_order: str,
+        rank_expr: Optional[Any],
+    ) -> list[Any]:
+        descending = sort_order != "asc"
+        if sort_by == "relevance" and rank_expr is not None:
+            return [rank_expr.desc(), Job.posted_date.desc().nullslast()]
+        column_map = {
+            "posted_date": Job.posted_date,
+            "salary_max": Job.salary_max,
+            "salary_min": Job.salary_min,
+        }
+        column = column_map.get(sort_by, Job.posted_date)
+        key = column.desc().nullslast() if descending else column.asc().nullsfirst()
+        # Stable tiebreaker so pagination never duplicates/skips rows.
+        return [key, Job.id]
+
+    async def search_with_filters(
+        self,
+        *,
+        q: Optional[str] = None,
+        employment_type: Optional[str] = None,
+        experience_level: Optional[str] = None,
+        salary_min: Optional[Decimal] = None,
+        salary_max: Optional[Decimal] = None,
+        location: Optional[str] = None,
+        is_remote: Optional[bool] = None,
+        days_ago: Optional[int] = None,
+        company_id: Optional[uuid.UUID] = None,
+        sort_by: str = "relevance",
+        sort_order: str = "desc",
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[tuple[Job, Optional[float]]], int]:
+        """Full-text search combined with structured filters.
+
+        Returns (rows, total) where each row is ``(job, relevance_score)``;
+        the score is ``None`` when no search query was supplied.
+        """
+        base_conditions: list[Any] = [Job.status == JobStatus.published]
+        rank_expr: Optional[Any] = None
+        tsquery: Optional[Any] = None
+        if q:
+            tsquery = self._build_tsquery(q)
+            base_conditions.append(Job.search_vector.op("@@")(tsquery))
+            rank_expr = func.ts_rank(Job.search_vector, tsquery).label("rank")
+
+        filter_kwargs: dict[str, Any] = dict(
+            employment_type=employment_type,
+            experience_level=experience_level,
+            salary_min=salary_min,
+            salary_max=salary_max,
+            location=location,
+            is_remote=is_remote,
+            days_ago=days_ago,
+            company_id=company_id,
+        )
+
+        count_stmt = select(func.count(Job.id)).where(*base_conditions)
+        count_stmt = self._apply_filters(count_stmt, **filter_kwargs)
+        total = (await self.session.execute(count_stmt)).scalar_one()
+
+        stmt = select(Job).where(*base_conditions)
+        if rank_expr is not None:
+            stmt = stmt.add_columns(rank_expr)
+        stmt = stmt.options(selectinload(Job.company))
+        stmt = self._apply_filters(stmt, **filter_kwargs)
+        stmt = stmt.order_by(*self._order_clause(sort_by, sort_order, rank_expr))
+        stmt = stmt.offset(offset).limit(limit)
+
+        result = await self.session.execute(stmt)
+        rows: list[tuple[Job, Optional[float]]] = []
+        for row in result.all():
+            job = row[0]
+            score: Optional[float]
+            score = float(row.rank) if q else None  # type: ignore[attr-defined]
+            rows.append((job, score))
+        return rows, total
+
+    async def find_related_jobs(
+        self,
+        job: Job,
+        *,
+        limit: int = 5,
+    ) -> Sequence[Job]:
+        """Published jobs from the same company or with a similar title."""
+        title_query = func.plainto_tsquery("english", job.title)
+        same_company = Job.company_id == job.company_id
+        similar_title = Job.search_vector.op("@@")(title_query)
+        similarity_rank = func.ts_rank(Job.search_vector, title_query)
+
+        stmt = (
+            select(Job)
+            .where(
+                Job.id != job.id,
+                Job.status == JobStatus.published,
+                same_company | similar_title,
+            )
+            .options(selectinload(Job.company))
+            .order_by(
+                # Same-company matches first, then newest.
+                same_company.desc(),
+                similarity_rank.desc(),
+                Job.posted_date.desc().nullslast(),
+            )
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
 
     # ── Status management ──────────────────────────────────────────────
 

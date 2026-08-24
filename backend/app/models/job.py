@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import (
     JSON,
     Boolean,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
@@ -16,7 +17,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -54,6 +55,15 @@ class Job(Base):
         Index("ix_jobs_company_id_status", "company_id", "status"),
         Index("ix_jobs_status_posted_date", "status", "posted_date"),
         Index("ix_jobs_category", "category"),
+        # Week 5: full-text search + frequently filtered columns
+        Index(
+            "ix_jobs_search_vector",
+            "search_vector",
+            postgresql_using="gin",
+        ),
+        Index("ix_jobs_employment_type", "employment_type"),
+        Index("ix_jobs_experience_level", "experience_level"),
+        Index("ix_jobs_is_remote_status_posted_date", "is_remote", "status", "posted_date"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -88,6 +98,20 @@ class Job(Base):
     # Location
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_remote: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Full-text search (PostgreSQL generated column, kept in sync by the DB).
+    # Weights: title='A', description='B', requirements='B', location='C'.
+    search_vector = mapped_column(
+        TSVECTOR,
+        Computed(
+            "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
+            "setweight(to_tsvector('english', coalesce(description, '')), 'B') || "
+            "setweight(to_tsvector('english', coalesce(requirements::text, '')), 'B') || "
+            "setweight(to_tsvector('english', coalesce(location, '')), 'C')",
+            persisted=True,
+        ),
+        nullable=True,
+    )
 
     # Relationships
     company_id: Mapped[uuid.UUID] = mapped_column(

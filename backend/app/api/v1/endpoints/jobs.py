@@ -1,19 +1,25 @@
 import uuid
+from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user, get_optional_current_user
 from app.core.database import get_db
+from app.core.pagination import compute_pagination
 from app.dependencies.company import require_employer
 from app.models.job import JobStatus
 from app.models.user import User
 from app.schemas.job import (
     JobActionResponse,
     JobCreate,
+    JobDetailResponse,
     JobListResponse,
     JobResponse,
+    JobSearchFilters,
+    JobSearchItem,
+    JobSearchResponse,
     JobUpdate,
 )
 from app.services.job_service import JobService
@@ -76,6 +82,73 @@ async def list_jobs(
     return _to_list_response(jobs, total, page, page_size)
 
 
+# ── Week 5: Public search (keep above /{job_id} routes) ─────────────
+
+
+@router.get("/search", response_model=JobSearchResponse)
+async def search_jobs(
+    q: Optional[str] = Query(None, max_length=200, description="Full-text search query"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=MAX_PAGE_SIZE),
+    employment_type: Optional[str] = Query(
+        None, pattern="^(full-time|part-time|contract|internship|remote)$"
+    ),
+    experience_level: Optional[str] = Query(None, pattern="^(entry|mid|senior|lead)$"),
+    salary_min: Optional[float] = Query(None, ge=0, description="Minimum desired salary"),
+    salary_max: Optional[float] = Query(None, ge=0, description="Maximum desired salary"),
+    location: Optional[str] = Query(None, max_length=255),
+    is_remote: Optional[bool] = None,
+    days_ago: Optional[int] = Query(
+        None, ge=1, le=365, description="Only jobs posted within the last N days"
+    ),
+    company_id: Optional[uuid.UUID] = None,
+    sort_by: str = Query(
+        "relevance", pattern="^(relevance|posted_date|salary_max|salary_min)$"
+    ),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
+    session: AsyncSession = Depends(get_db),
+) -> JobSearchResponse:
+    """Public job search: PostgreSQL full-text search with filters,
+    sorting and pagination. Only published jobs are returned."""
+    try:
+        filters = JobSearchFilters(
+            q=q,
+            employment_type=employment_type,  # type: ignore[arg-type]
+            experience_level=experience_level,  # type: ignore[arg-type]
+            salary_min=(
+                Decimal(str(salary_min)) if salary_min is not None else None
+            ),
+            salary_max=(
+                Decimal(str(salary_max)) if salary_max is not None else None
+            ),
+            location=location,
+            is_remote=is_remote,
+            days_ago=days_ago,
+            company_id=company_id,
+            sort_by=sort_by,  # type: ignore[arg-type]
+            sort_order=sort_order,  # type: ignore[arg-type]
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    service = _get_job_service(session)
+    rows, total = await service.search_jobs(
+        page=page,
+        limit=limit,
+        **filters.model_dump(),
+    )
+    items = [
+        JobSearchItem.model_validate(job).model_copy(
+            update={"relevance_score": score}
+        )
+        for job, score in rows
+    ]
+    return JobSearchResponse(
+        items=items,
+        **compute_pagination(total=total, page=page, limit=limit),
+    )
+
+
 # ── Employer actions ────────────────────────────────────────────────
 
 
@@ -93,16 +166,30 @@ async def create_job(
 # ── Item routes ─────────────────────────────────────────────────────
 
 
-@router.get("/{job_id}", response_model=JobResponse)
+@router.get("/{job_id}", response_model=JobDetailResponse)
 async def get_job_details(
     job_id: uuid.UUID,
+    include_related: bool = Query(
+        True, alias="include_related", description="Include related job openings"
+    ),
     viewer: Optional[User] = Depends(get_optional_current_user),
     session: AsyncSession = Depends(get_db),
-) -> JobResponse:
-    """Public job details; drafts and closed jobs are visible to their owner only."""
+) -> JobDetailResponse:
+    """Public job details; drafts and closed jobs are visible to their owner only.
+
+    Includes company information and (optionally) related published openings
+    from the same company or with a similar title."""
     service = _get_job_service(session)
-    job = await service.get_job_detail(job_id, viewer=viewer)
-    return JobResponse.model_validate(job)
+    job, related = await service.get_job_detail(
+        job_id,
+        viewer=viewer,
+        include_related=include_related,
+    )
+    detail = JobDetailResponse.model_validate(job)
+    detail.related_jobs = [
+        JobSearchItem.model_validate(related_job) for related_job in related
+    ]
+    return detail
 
 
 @router.put("/{job_id}", response_model=JobResponse)
