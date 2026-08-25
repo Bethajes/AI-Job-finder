@@ -45,3 +45,17 @@ async def get_current_user(
         raise credentials_exception
 
     return user
+
+
+async def get_optional_current_user(
+    request: Request,
+    token_payload: Optional[dict] = Depends(bearer_scheme),
+    session: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    """Like get_current_user but returns None instead of raising 401."""
+    if token_payload is None:
+        return None
+    try:
+        return await get_current_user(request, token_payload, session)
+    except Exception:
+        return None
