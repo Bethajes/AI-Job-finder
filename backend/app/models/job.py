@@ -23,6 +23,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.application import Application
     from app.models.company import Company
     from app.models.user import User
 
@@ -168,6 +169,9 @@ class Job(Base):
         "Company", back_populates="jobs"
     )
     posted_by: Mapped["User"] = relationship("User", viewonly=True)
+    applications: Mapped[list["Application"]] = relationship(
+        "Application", back_populates="job", passive_deletes=True
+    )
 
     @property
     def is_open(self) -> bool:

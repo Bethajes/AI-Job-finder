@@ -41,6 +41,9 @@ faker==20.1.0
 # Utilities
 python-dateutil==2.8.2
 
+# Firebase Cloud Messaging
+firebase-admin==6.5.0
+
 # File Upload
 cloudinary==1.40.0
 Pillow==10.4.0

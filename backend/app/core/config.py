@@ -37,12 +37,18 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str = ""
     CLOUDINARY_API_SECRET: str = ""
 
+    # Local file storage fallback (used when Cloudinary is not configured)
+    UPLOAD_DIR: str = "uploads"
+
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = 100
     RATE_LIMIT_PERIOD: int = 60
 
     # Sentry
     SENTRY_DSN: str = ""
+
+    # Firebase Cloud Messaging (empty string disables push notifications)
+    FIREBASE_CREDENTIALS_PATH: str = ""
 
     model_config = ConfigDict(
         env_file=".env",

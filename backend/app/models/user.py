@@ -1,9 +1,9 @@
 import enum
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import String, Boolean, DateTime, func
+from sqlalchemy import JSON, String, Boolean, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,6 +12,13 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.job_seeker import JobSeekerProfile
     from app.models.company import Company
+
+DEFAULT_NOTIFICATION_PREFERENCES: dict[str, Any] = {
+    "application_updates": True,
+    "new_jobs": True,
+    "marketing": False,
+    "in_app": True,
+}
 
 
 class UserRole(str, enum.Enum):
@@ -57,6 +64,11 @@ class User(Base):
     )
     email_verified_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    # Week 7: push notification preferences (JSON with sensible defaults)
+    notification_preferences: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
     )
 
     job_seeker_profile: Mapped[Optional["JobSeekerProfile"]] = relationship(

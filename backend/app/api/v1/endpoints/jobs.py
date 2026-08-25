@@ -2,7 +2,7 @@ import uuid
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user, get_optional_current_user
@@ -23,6 +23,7 @@ from app.schemas.job import (
     JobUpdate,
 )
 from app.services.job_service import JobService
+from app.services.notification_service import send_new_job_alerts_push
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -235,9 +236,15 @@ async def close_job(
 @router.patch("/{job_id}/publish", response_model=JobResponse)
 async def publish_job(
     job_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_employer),
     session: AsyncSession = Depends(get_db),
 ) -> JobResponse:
     service = _get_job_service(session)
     job = await service.publish_job(user=current_user, job_id=job_id)
+    # Week 7: notify matching job seekers in the background
+    background_tasks.add_task(
+        send_new_job_alerts_push,
+        job_id=job.id,
+    )
     return JobResponse.model_validate(job)
