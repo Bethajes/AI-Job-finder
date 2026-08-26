@@ -38,6 +38,14 @@ class Company(Base):
     profile_picture_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     profile_completeness: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
 
+    # Week 8: admin-driven verification lifecycle. `is_verified` stays in
+    # sync (approved -> True) for backward compatibility with Week 2-7 code.
+    verification_status: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True, default="pending", server_default="pending"
+    )
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    admin_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

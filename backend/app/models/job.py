@@ -23,6 +23,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.application import Application
     from app.models.company import Company
     from app.models.user import User
 
@@ -152,6 +153,16 @@ class Job(Base):
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     tags: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
 
+    # Week 8: moderation (hidden jobs are excluded from public listings).
+    is_hidden: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    is_flagged: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    flagged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    admin_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -168,6 +179,9 @@ class Job(Base):
         "Company", back_populates="jobs"
     )
     posted_by: Mapped["User"] = relationship("User", viewonly=True)
+    applications: Mapped[list["Application"]] = relationship(
+        "Application", back_populates="job", passive_deletes=True
+    )
 
     @property
     def is_open(self) -> bool:
