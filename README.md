@@ -2,13 +2,14 @@
 
 A modern job-finding platform built for the Ethiopian market.
 
-**Status:** V1 — Foundation (complete), Authentication (next)
+**Status:** V1 — Weeks 1–12 complete (API, mobile, employer dashboard, admin dashboard, production deployment)
 
 - **Backend:** FastAPI modular monolith — see [`backend/README.md`](backend/README.md)
-- **Mobile:** React Native + Expo (`mobile-app/`)
+- **Mobile:** React Native + Expo (`mobile-app/`, `ethiopian-jobs-mobile/`)
 - **Employer Dashboard:** Next.js (`employer-dashboard/`)
-- **Admin Dashboard:** Next.js (`admin-dashboard/`)
+- **Admin Dashboard:** served by the Next.js app at `/admin` (role-gated)
 - **Docs:** [`docs/`](docs/)
+- **Deployment:** [`DEPLOYMENT.md`](DEPLOYMENT.md) · QA checklist: [`docs/QA-CHECKLIST.md`](docs/QA-CHECKLIST.md)
 
 ## Quick Start (backend)
 

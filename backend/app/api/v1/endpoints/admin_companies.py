@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.enums import VerificationStatus
 from app.core.pagination import compute_pagination
+from app.core.rate_limit import rate_limit
 from app.dependencies.admin import require_admin
 from app.models.user import User
 from app.schemas.admin import (
@@ -27,7 +28,11 @@ from app.schemas.admin import (
 from app.services.admin_service import AdminService
 from app.services.notification_service import send_company_verification_email
 
-router = APIRouter(prefix="/admin/companies", tags=["admin"])
+router = APIRouter(
+    prefix="/admin/companies",
+    tags=["admin"],
+    dependencies=[rate_limit("admin")],
+)
 
 MAX_PAGE_SIZE = 100
 

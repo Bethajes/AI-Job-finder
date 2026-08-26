@@ -72,12 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await api.post<AuthTokens>("/auth/login", { email, password });
       storeTokens(res.data);
       const me = await fetchMe();
-      if (me.role !== "employer") {
+      if (me.role !== "employer" && me.role !== "admin") {
         clearTokens();
-        throw new Error("This dashboard is for employer accounts only");
+        throw new Error(
+          "This dashboard is for employer and admin accounts only"
+        );
       }
       setUser(me);
-      router.push("/dashboard");
+      router.push(me.role === "admin" ? "/admin" : "/dashboard");
     },
     [router]
   );

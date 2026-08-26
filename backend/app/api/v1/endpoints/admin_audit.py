@@ -9,12 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import compute_pagination
+from app.core.rate_limit import rate_limit
 from app.dependencies.admin import require_admin
 from app.models.user import User
 from app.schemas.admin import AdminAuditLogListResponse, AdminLogEntry
 from app.services.audit_service import AuditService
 
-router = APIRouter(prefix="/admin/audit-logs", tags=["admin"])
+router = APIRouter(
+    prefix="/admin/audit-logs",
+    tags=["admin"],
+    dependencies=[rate_limit("admin")],
+)
 
 MAX_PAGE_SIZE = 100
 

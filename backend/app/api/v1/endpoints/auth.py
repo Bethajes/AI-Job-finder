@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.exceptions import BadRequestException
+from app.core.rate_limit import rate_limit
 from app.core.security import (
     EMAIL_VERIFICATION_TOKEN_TYPE,
     create_access_token,
@@ -73,6 +74,7 @@ async def _send_welcome_email(
 async def register(
     body: UserCreate,
     background_tasks: BackgroundTasks,
+    _rl=rate_limit("auth"),
     session: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     auth_service = AuthService(session)
@@ -91,6 +93,7 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     body: UserLogin,
+    _rl=rate_limit("auth"),
     session: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     auth_service = AuthService(session)

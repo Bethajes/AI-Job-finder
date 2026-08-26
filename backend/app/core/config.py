@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = 100
     RATE_LIMIT_PERIOD: int = 60
+    # Force-enable rate limiting outside production (auto-enabled in prod).
+    ENABLE_RATE_LIMIT: bool = False
 
     # Sentry
     SENTRY_DSN: str = ""

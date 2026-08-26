@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.rate_limit import rate_limit
 from app.dependencies.admin import require_admin
 from app.models.user import User
 from app.schemas.stats import (
@@ -17,7 +18,11 @@ from app.schemas.stats import (
 )
 from app.services.admin_service import AdminService
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[rate_limit("admin")],
+)
 
 
 def _get_service(session: AsyncSession) -> AdminService:
