@@ -1,6 +1,7 @@
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -15,10 +16,18 @@ import { JobCard } from '../../components/jobs';
 import { Loading } from '../../components/common';
 import { colors, fontFamily, fontSize, radius, spacing } from '../../constants/theme';
 import { useAuth } from '../../hooks/useAuth';
-import { useJobs } from '../../hooks/useApi';
-import { MainTabParamList } from '../../navigation/types';
+import { useLatestJobs } from '../../hooks/useJobs';
+import {
+  useSavedJobIds,
+  useToggleSavedJob,
+} from '../../hooks/useSavedJobs';
+import {
+  MainTabParamList,
+  RootStackParamList,
+} from '../../navigation/types';
 
-type HomeScreenNavigationProp = BottomTabNavigationProp<MainTabParamList, 'Home'>;
+type HomeScreenNavigationProp = BottomTabNavigationProp<MainTabParamList, 'Home'> &
+  NativeStackNavigationProp<RootStackParamList, 'JobDetail'>;
 
 interface HomeScreenProps {
   navigation: HomeScreenNavigationProp;
@@ -26,12 +35,16 @@ interface HomeScreenProps {
 
 export function HomeScreen({ navigation }: HomeScreenProps) {
   const { user } = useAuth();
-  const jobsQuery = useJobs({}, 1, 5);
-  const recentJobs = jobsQuery.data?.items ?? [];
+  const jobsQuery = useLatestJobs(5);
+  const savedJobIds = useSavedJobIds();
+  const toggleSavedJob = useToggleSavedJob();
+
+  const recentJobs = useMemo(() => jobsQuery.data?.items ?? [], [jobsQuery.data]);
+  const refetchJobs = jobsQuery.refetch;
 
   const handleRefresh = useCallback(() => {
-    void jobsQuery.refetch();
-  }, [jobsQuery.refetch]);
+    void refetchJobs();
+  }, [refetchJobs]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -100,7 +113,19 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         ) : (
           <View style={styles.jobList}>
             {recentJobs.map((job) => (
-              <JobCard key={job.id} job={job} />
+              <JobCard
+                key={job.id}
+                job={job}
+                isSaved={savedJobIds.has(job.id)}
+                onPress={() => navigation.navigate('JobDetail', { jobId: job.id })}
+                onToggleSave={() =>
+                  toggleSavedJob.mutate({
+                    jobId: job.id,
+                    save: !savedJobIds.has(job.id),
+                    job,
+                  })
+                }
+              />
             ))}
           </View>
         )}

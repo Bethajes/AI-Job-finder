@@ -1,18 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Loading } from '../../components/common';
-import { JobCard } from '../../components/jobs';
+import {
+  JobCard,
+  JobCardSkeleton,
+  JobFiltersModal,
+  JobSearchBar,
+} from '../../components/jobs';
 import {
   colors,
   fontFamily,
@@ -20,96 +25,138 @@ import {
   radius,
   spacing,
 } from '../../constants/theme';
-import { useInfiniteJobs } from '../../hooks/useApi';
-import { Job } from '../../types';
+import { useInfiniteJobs } from '../../hooks/useJobs';
+import {
+  useSavedJobIds,
+  useToggleSavedJob,
+} from '../../hooks/useSavedJobs';
+import { RootStackParamList } from '../../navigation/types';
+import { JobFilters, JobSearchItem } from '../../types';
 
-export function JobsScreen() {
-  const [searchInput, setSearchInput] = useState('');
-  const [activeSearch, setActiveSearch] = useState('');
+type JobsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'JobDetail'
+>;
 
-  const jobsQuery = useInfiniteJobs(
-    useMemo(() => (activeSearch ? { search: activeSearch } : {}), [activeSearch]),
+interface JobsScreenProps {
+  navigation: JobsScreenNavigationProp;
+}
+
+export function JobsScreen({ navigation }: JobsScreenProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<JobFilters>({});
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+
+  const effectiveFilters = useMemo<JobFilters>(
+    () => ({ ...filters, q: searchQuery || undefined }),
+    [filters, searchQuery],
   );
+
+  const jobsQuery = useInfiniteJobs(effectiveFilters);
+  const savedJobIds = useSavedJobIds();
+  const toggleSavedJob = useToggleSavedJob();
+  const { hasNextPage, isFetchingNextPage, fetchNextPage, refetch, isError, isLoading, isRefetching } =
+    jobsQuery;
 
   const jobs = useMemo(
     () => jobsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [jobsQuery.data],
   );
 
-  const handleRefresh = useCallback(() => {
-    void jobsQuery.refetch();
-  }, [jobsQuery.refetch]);
+  const activeFilterCount = useMemo(
+    () =>
+      Object.values(filters).filter((value) => value !== undefined && value !== false)
+        .length,
+    [filters],
+  );
+
+  const openJobDetail = useCallback(
+    (jobId: string) => {
+      navigation.navigate('JobDetail', { jobId });
+    },
+    [navigation],
+  );
+
+  const handleToggleSave = useCallback(
+    (job: JobSearchItem) => {
+      toggleSavedJob.mutate({
+        jobId: job.id,
+        save: !savedJobIds.has(job.id),
+        job,
+      });
+    },
+    [toggleSavedJob, savedJobIds],
+  );
 
   const loadMore = useCallback(() => {
-    if (jobsQuery.hasNextPage && !jobsQuery.isFetchingNextPage) {
-      void jobsQuery.fetchNextPage();
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
     }
-  }, [
-    jobsQuery.hasNextPage,
-    jobsQuery.isFetchingNextPage,
-    jobsQuery.fetchNextPage,
-  ]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const submitSearch = useCallback(() => {
-    setActiveSearch(searchInput.trim());
-  }, [searchInput]);
-
-  const clearSearch = useCallback(() => {
-    setSearchInput('');
-    setActiveSearch('');
-  }, []);
-
-  const renderItem = useCallback(({ item }: { item: Job }) => (
-    <JobCard job={item} />
-  ), []);
+  const renderJob = useCallback(
+    ({ item }: { item: JobSearchItem }) => (
+      <JobCard
+        job={item}
+        onPress={() => openJobDetail(item.id)}
+        isSaved={savedJobIds.has(item.id)}
+        onToggleSave={() => handleToggleSave(item)}
+      />
+    ),
+    [openJobDetail, savedJobIds, handleToggleSave],
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Find Jobs</Text>
-        <View style={styles.searchRow}>
-          <Ionicons
-            name="search"
-            size={18}
-            color={colors.textMuted}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Job title or keyword"
-            placeholderTextColor={colors.textMuted}
-            value={searchInput}
-            onChangeText={setSearchInput}
-            onSubmitEditing={submitSearch}
-            returnKeyType="search"
-            autoCapitalize="none"
-          />
-          {searchInput.length > 0 ? (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              onPress={clearSearch}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          ) : null}
+        <View style={styles.controlsRow}>
+          <JobSearchBar onSearch={setSearchQuery} />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Open filters"
+            style={styles.filterButton}
+            onPress={() => setIsFilterModalVisible(true)}
+          >
+            <Ionicons name="options-outline" size={20} color={colors.primaryDark} />
+            {activeFilterCount > 0 ? (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
         </View>
+        {activeFilterCount > 0 ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => setFilters({})}
+            style={styles.clearFilters}
+          >
+            <Ionicons name="close-circle" size={14} color={colors.textMuted} />
+            <Text style={styles.clearFiltersText}>
+              {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active — clear
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
-      {jobsQuery.isLoading ? (
-        <Loading message="Searching jobs…" fullscreen={false} />
-      ) : jobsQuery.isError ? (
+      {isLoading ? (
+        <View style={styles.skeletonList}>
+          {[1, 2, 3, 4].map((index) => (
+            <JobCardSkeleton key={index} />
+          ))}
+        </View>
+      ) : isError ? (
         <View style={styles.stateCard}>
           <Ionicons name="cloud-offline-outline" size={32} color={colors.textMuted} />
           <Text style={styles.stateTitle}>Something went wrong</Text>
           <Text style={styles.stateSubtitle}>
-            We couldn't reach the server. Check your connection.
+            We could not reach the server. Check your connection.
           </Text>
           <TouchableOpacity
             accessibilityRole="button"
             style={styles.retryButton}
-            onPress={() => void jobsQuery.refetch()}
+            onPress={() => void refetch()}
           >
             <Text style={styles.retryText}>Try Again</Text>
           </TouchableOpacity>
@@ -118,15 +165,15 @@ export function JobsScreen() {
         <FlatList
           data={jobs}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
+          renderItem={renderJob}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={Separator}
-          onEndReachedThreshold={0.4}
+          onEndReachedThreshold={0.5}
           onEndReached={loadMore}
           refreshControl={
             <RefreshControl
-              refreshing={jobsQuery.isRefetching}
-              onRefresh={handleRefresh}
+              refreshing={isRefetching && !isFetchingNextPage}
+              onRefresh={() => void refetch()}
               tintColor={colors.primary}
             />
           }
@@ -135,21 +182,28 @@ export function JobsScreen() {
               <Ionicons name="briefcase-outline" size={32} color={colors.textMuted} />
               <Text style={styles.stateTitle}>No jobs found</Text>
               <Text style={styles.stateSubtitle}>
-                {activeSearch
-                  ? `Nothing matches "${activeSearch}". Try a different keyword.`
+                {searchQuery || activeFilterCount > 0
+                  ? 'Nothing matches your search or filters. Try adjusting them.'
                   : 'No jobs have been posted yet. Check back soon.'}
               </Text>
             </View>
           }
           ListFooterComponent={
-            jobsQuery.isFetchingNextPage ? (
+            isFetchingNextPage ? (
               <View style={styles.footerLoading}>
-                <Loading message="Loading more…" fullscreen={false} />
+                <ActivityIndicator size="large" color={colors.primary} />
               </View>
             ) : null
           }
         />
       )}
+
+      <JobFiltersModal
+        visible={isFilterModalVisible}
+        filters={filters}
+        onClose={() => setIsFilterModalVisible(false)}
+        onApply={setFilters}
+      />
     </SafeAreaView>
   );
 }
@@ -177,30 +231,54 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     color: colors.text,
   },
-  searchRow: {
+  controlsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.background,
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    backgroundColor: colors.background,
   },
-  searchIcon: {
-    marginRight: -spacing.xs,
+  filterBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  searchInput: {
-    flex: 1,
-    paddingVertical: spacing.sm + 3,
-    fontSize: fontSize.md,
-    fontFamily: fontFamily.regular,
-    color: colors.text,
+  filterBadgeText: {
+    fontSize: fontSize.sm - 3,
+    fontFamily: fontFamily.bold,
+    color: colors.white,
+  },
+  clearFilters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+  },
+  clearFiltersText: {
+    fontSize: fontSize.sm - 1,
+    color: colors.textMuted,
   },
   listContent: {
     padding: spacing.lg,
     paddingBottom: spacing.xl,
+  },
+  skeletonList: {
+    padding: spacing.lg,
+    gap: spacing.md - 2,
   },
   separator: {
     height: spacing.md - 2,

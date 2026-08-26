@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import {
   colors,
@@ -9,19 +9,33 @@ import {
   radius,
   spacing,
 } from '../../constants/theme';
-import { Job } from '../../types';
+import { JobSearchItem } from '../../types';
 import {
+  formatDate,
   formatEmploymentType,
   formatSalaryRange,
 } from '../../utils/format';
 
 interface JobCardProps {
-  job: Job;
+  job: JobSearchItem;
+  onPress?: () => void;
+  isSaved?: boolean;
+  onToggleSave?: () => void;
 }
 
-export const JobCard = React.memo(function JobCard({ job }: JobCardProps) {
+export const JobCard = React.memo(function JobCard({
+  job,
+  onPress,
+  isSaved = false,
+  onToggleSave,
+}: JobCardProps) {
   return (
-    <View style={styles.card}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`View ${job.title} at ${job.company.name}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+    >
       <View style={styles.headerRow}>
         <View style={styles.logoPlaceholder}>
           <Text style={styles.logoText}>
@@ -37,6 +51,22 @@ export const JobCard = React.memo(function JobCard({ job }: JobCardProps) {
             {job.company.is_verified ? ' ✓' : ''}
           </Text>
         </View>
+        {onToggleSave ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={isSaved ? 'Remove from saved jobs' : 'Save job'}
+            accessibilityState={{ selected: isSaved }}
+            onPress={onToggleSave}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.saveButton}
+          >
+            <Ionicons
+              name={isSaved ? 'bookmark' : 'bookmark-outline'}
+              size={22}
+              color={isSaved ? colors.primary : colors.textMuted}
+            />
+          </TouchableOpacity>
+        ) : null}
       </View>
       <View style={styles.metaRow}>
         <View style={styles.metaItem}>
@@ -64,7 +94,10 @@ export const JobCard = React.memo(function JobCard({ job }: JobCardProps) {
           <Text style={styles.levelText}>{job.experience_level}</Text>
         </View>
       </View>
-    </View>
+      {job.posted_date ? (
+        <Text style={styles.postedDate}>Posted {formatDate(job.posted_date)}</Text>
+      ) : null}
+    </Pressable>
   );
 });
 
@@ -76,6 +109,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     gap: spacing.sm + 2,
+  },
+  pressed: {
+    opacity: 0.9,
   },
   headerRow: {
     flexDirection: 'row',
@@ -108,6 +144,9 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontFamily: fontFamily.regular,
     color: colors.textMuted,
+  },
+  saveButton: {
+    marginLeft: spacing.xs,
   },
   metaRow: {
     flexDirection: 'row',
@@ -157,6 +196,10 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.medium,
     color: colors.textMuted,
     textTransform: 'capitalize',
+  },
+  postedDate: {
+    fontSize: fontSize.sm - 2,
+    color: colors.textMuted,
   },
 });
 

@@ -4,6 +4,7 @@ import {
   NavigationContainer,
   Theme,
 } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import {
   Inter_400Regular,
@@ -11,13 +12,17 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 
 import { SplashScreen } from '../screens/SplashScreen';
+import { JobDetailScreen } from '../screens/main/JobDetailScreen';
 import { colors } from '../constants/theme';
 import { useAuthStore } from '../store';
 import { AuthStack } from './AuthStack';
 import { MainTabs } from './MainTabs';
+import { RootStackParamList } from './types';
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const navigationTheme: Theme = {
   ...DefaultTheme,
@@ -42,7 +47,7 @@ export function AppNavigator() {
     Inter_500Medium,
     Inter_700Bold,
   });
-  const [isReady, setIsReady] = useState(false);
+  const isReady = (fontsLoaded || fontError != null) && !isBootstrapping;
 
   useEffect(() => {
     ExpoSplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -53,19 +58,29 @@ export function AppNavigator() {
   }, [restoreSession]);
 
   useEffect(() => {
-    if ((fontsLoaded || fontError) && !isBootstrapping) {
-      setIsReady(true);
+    if (isReady) {
       ExpoSplashScreen.hideAsync().catch(() => undefined);
     }
-  }, [fontsLoaded, fontError, isBootstrapping]);
+  }, [isReady]);
 
-  if (!isReady || isBootstrapping) {
+  if (!isReady) {
     return <SplashScreen />;
   }
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      {isAuthenticated ? <MainTabs /> : <AuthStack />}
+      {isAuthenticated ? (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen
+            name="JobDetail"
+            component={JobDetailScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+        </Stack.Navigator>
+      ) : (
+        <AuthStack />
+      )}
     </NavigationContainer>
   );
 }
