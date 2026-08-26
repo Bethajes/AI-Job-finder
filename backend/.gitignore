@@ -12,3 +12,6 @@ venv/
 .env
 .env.*
 !.env.example
+
+# Local file storage fallback (runtime uploads)
+uploads/

@@ -32,6 +32,7 @@ from app.utils.email_templates import (
     application_confirmation_html,
     application_status_update_html,
     application_withdrawn_confirmation_html,
+    company_verification_result_html,
     new_application_employer_html,
 )
 
@@ -130,6 +131,28 @@ async def send_withdrawal_confirmation(
             "Withdrawal confirmation email failed applicant=%s job=%s",
             applicant_email,
             job_title,
+        )
+
+
+async def send_company_verification_email(
+    *,
+    owner_email: str,
+    owner_first_name: str,
+    company_name: str,
+    status: str,
+    admin_notes: str | None = None,
+) -> None:
+    """Tell the company owner their verification status changed (Week 8)."""
+    subject, html = company_verification_result_html(
+        owner_first_name, company_name, status, admin_notes
+    )
+    sent = await email_service.send_email(to=owner_email, subject=subject, html=html)
+    if not sent:
+        logger.warning(
+            "Company verification email failed owner=%s company=%s status=%s",
+            owner_email,
+            company_name,
+            status,
         )
 
 

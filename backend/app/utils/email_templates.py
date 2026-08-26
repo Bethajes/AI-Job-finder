@@ -182,3 +182,46 @@ def application_withdrawn_confirmation_html(
         <p>You can apply again in the future if the position is still open.</p>
     """
     return subject, _wrap(body)
+
+
+_COMPANY_VERIFICATION_LABELS = {
+    "approved": "approved",
+    "rejected": "rejected",
+    "pending": "set back to pending review",
+}
+
+
+def company_verification_result_html(
+    owner_first_name: str,
+    company_name: str,
+    status: str,
+    admin_notes: str | None = None,
+) -> tuple[str, str]:
+    status_text = _COMPANY_VERIFICATION_LABELS.get(status, status)
+    subject = f"Company verification update - {company_name}"
+    notes_block = (
+        f"<p><strong>Moderator note:</strong> {admin_notes}</p>"
+        if admin_notes
+        else ""
+    )
+    if status == "approved":
+        outcome = (
+            "Your company has been verified. You can now publish job "
+            "postings and start receiving applications."
+        )
+    elif status == "rejected":
+        outcome = (
+            "Unfortunately your verification request was not approved. "
+            "Please review the moderator's notes below and resubmit."
+        )
+    else:
+        outcome = "Your company verification status was changed to pending."
+    body = f"""
+        <h2 style="color: #2563eb;">Company verification update</h2>
+        <p>Hi {owner_first_name},</p>
+        <p>The verification status of <strong>{company_name}</strong> has been
+        {status_text}.</p>
+        <p>{outcome}</p>
+        {notes_block}
+    """
+    return subject, _wrap(body)

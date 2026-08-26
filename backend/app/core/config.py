@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # Firebase Cloud Messaging (empty string disables push notifications)
     FIREBASE_CREDENTIALS_PATH: str = ""
 
+    # Week 8: admin
+    # Emails allowed to use super-admin-only operations (require_super_admin).
+    SUPER_ADMIN_EMAILS: List[str] = []
+    # Dashboard-stats Redis cache TTL in seconds (spec: 5-15 minutes).
+    STATS_CACHE_TTL: int = 300
+
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

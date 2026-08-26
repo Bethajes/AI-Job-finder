@@ -105,7 +105,8 @@ class JobRepository:
         offset: int = 0,
         limit: int = 20,
     ) -> tuple[Sequence[Job], int]:
-        conditions: list[Any] = [Job.status == status]
+        # Public browse never surfaces admin-hidden jobs (Week 8).
+        conditions: list[Any] = [Job.status == status, Job.is_hidden.is_(False)]
         if company_id is not None:
             conditions.append(Job.company_id == company_id)
         if employment_type is not None:
@@ -226,7 +227,10 @@ class JobRepository:
         Returns (rows, total) where each row is ``(job, relevance_score)``;
         the score is ``None`` when no search query was supplied.
         """
-        base_conditions: list[Any] = [Job.status == JobStatus.published]
+        base_conditions: list[Any] = [
+            Job.status == JobStatus.published,
+            Job.is_hidden.is_(False),  # admin-hidden jobs stay out of search
+        ]
         rank_expr: Optional[Any] = None
         tsquery: Optional[Any] = None
         if q:
@@ -283,6 +287,7 @@ class JobRepository:
             .where(
                 Job.id != job.id,
                 Job.status == JobStatus.published,
+                Job.is_hidden.is_(False),
                 same_company | similar_title,
             )
             .options(selectinload(Job.company))
